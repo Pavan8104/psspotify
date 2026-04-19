@@ -32,5 +32,3 @@ Best of NCS Release - Warriyo, Cielo, DEAF KEV etc.
 
 ## GitHub
 https://github.com/Pavan8104/psspotify
-
-Built by BLACKBOXAI
