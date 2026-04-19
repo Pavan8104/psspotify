@@ -1,4 +1,4 @@
-console.log("PSSpotify - Modern Frontend Player");
+console.log("PSSpotify Pro");
 
 const songs = [
   {songName: "Warriyo - Mortals [NCS Release]", filePath: "/1.mp3", coverPath: "/1.jpg"},
@@ -15,13 +15,16 @@ const songs = [
 
 import './style.css';
 
-// DOM Elements
 const app = document.getElementById('app');
-const songListContainer = document.createElement('div');
-songListContainer.className = 'songListContainer';
 
-// Build UI structure
-app.innerHTML = `
+// Add search
+const searchHTML = `
+  <div style="padding: 10px; background: rgba(0,0,0,0.5);">
+    <input type="text" id="songSearch" placeholder="Search songs..." style="width: 300px; padding: 8px; border-radius: 20px; border: none;">
+  </div>
+`;
+
+app.innerHTML = searchHTML + `
   <nav>
     <ul>
       <li class="brand"><img src="/logo.png" alt="PSSpotify"> PSSpotify</li>
@@ -31,151 +34,191 @@ app.innerHTML = `
   </nav>
   <div class="container">
     <div class="songList">
-      <h1>Best of NCS - No Copyright Sounds</h1>
+      <h1>Best of NCS</h1>
       <div class="songItemContainer" id="songItemContainer">
-        <!-- Dynamic songs here -->
       </div>
     </div>
     <div class="songBanner"></div>
   </div>
   <div class="bottom">
-    <input type="range" name="range" id="myProgressBar" min="0" value="0" max="100">
+    <div style="display: flex; width: 80vw; justify-content: space-between; align-items: center;">
+      <span id="currentTime">0:00</span>
+      <input type="range" id="myProgressBar" min="0" value="0" max="100" style="flex:1; margin: 0 10px;">
+      <span id="totalTime">0:00</span>
+    </div>
     <div class="icons">
+      <i class="fas fa-volume-mute fa-2x" id="volumeIcon"></i>
+      <input type="range" id="volumeSlider" min="0" max="100" value="50" style="width: 100px;">
       <i class="fas fa-3x fa-step-backward" id="previous"></i>
       <i class="far fa-3x fa-play-circle" id="masterPlay"></i>
       <i class="fas fa-3x fa-step-forward" id="next"></i> 
     </div>
     <div class="songInfo">
       <img src="/playing.gif" width="42px" alt="" id="gif"> 
-      <span id="masterSongName">Warriyo - Mortals [NCS Release]</span>
+      <span id="masterSongName">Select a song</span>
     </div>
   </div>
 `;
 
-// Dynamic song list
 const songItemContainer = document.getElementById('songItemContainer');
-songs.forEach((song, i) => {
-  const songItem = document.createElement('div');
-  songItem.className = 'songItem';
-  songItem.innerHTML = `
-    <img src="${song.coverPath}" alt="${song.songName}">
-    <span class="songName">${song.songName}</span>
-    <span class="songlistplay">
-      <span class="timestamp">05:34 
-        <i id="${i}" class="far songItemPlay fa-play-circle"></i>
-      </span>
-    </span>
-  `;
-  songItemContainer.appendChild(songItem);
-});
-
-// Audio & Controls
+const songSearch = document.getElementById('songSearch');
 let songIndex = 0;
-let audioElement = new Audio(songs[0].filePath);
+let audioElement = new Audio();
 let masterPlay = document.getElementById('masterPlay');
 let myProgressBar = document.getElementById('myProgressBar');
 let gif = document.getElementById('gif');
 let masterSongName = document.getElementById('masterSongName');
+let volumeSlider = document.getElementById('volumeSlider');
+let currentTimeEl = document.getElementById('currentTime');
+let totalTimeEl = document.getElementById('totalTime');
+let volumeIcon = document.getElementById('volumeIcon');
 
-// LocalStorage for recent plays
+// Build song list
+function renderSongs(filter = '') {
+  songItemContainer.innerHTML = '';
+  songs.filter(song => song.songName.toLowerCase().includes(filter.toLowerCase())).forEach((song, i) => {
+    const songItem = document.createElement('div');
+    songItem.className = 'songItem';
+    songItem.innerHTML = `
+      <img src="${song.coverPath}" alt="${song.songName}">
+      <span class="songName">${song.songName}</span>
+      <span class="songlistplay">
+        <span class="timestamp">05:34 
+          <i id="${i}" class="far songItemPlay fa-play-circle"></i>
+        </span>
+      </span>
+    `;
+    songItemContainer.appendChild(songItem);
+  });
+  attachSongListeners();
+}
+
+// Initial render
+renderSongs();
+
+// Search
+songSearch.addEventListener('input', (e) => renderSongs(e.target.value));
+
+// localStorage
 function loadRecent() {
-  const recent = localStorage.getItem('recentSongs');
-  if (recent) {
-    const parsed = JSON.parse(recent);
-    songIndex = parsed[parsed.length - 1] || 0;
-    audioElement.src = songs[songIndex].filePath;
-    masterSongName.textContent = songs[songIndex].songName;
+  const recent = JSON.parse(localStorage.getItem('recentSongs') || '[]');
+  if (recent.length) {
+    songIndex = recent[recent.length - 1];
+    updateUI();
   }
 }
 
 function saveRecent(index) {
   let recent = JSON.parse(localStorage.getItem('recentSongs') || '[]');
+  const indexStr = recent.indexOf(index);
+  if (indexStr > -1) recent.splice(indexStr, 1);
   recent.push(index);
-  if (recent.length > 10) recent.shift(); // Keep last 10
+  if (recent.length > 10) recent.shift();
   localStorage.setItem('recentSongs', JSON.stringify(recent));
-  songIndex = index;
 }
 
-// Init
-loadRecent();
+// Update UI for current song
+function updateUI() {
+  masterSongName.textContent = songs[songIndex].songName;
+  audioElement.src = songs[songIndex].filePath;
+}
 
 // Play/Pause
 masterPlay.addEventListener('click', () => {
-  if (audioElement.paused || audioElement.currentTime <= 0) {
+  if (audioElement.paused) {
     audioElement.play();
-    masterPlay.classList.remove('fa-play-circle');
-    masterPlay.classList.add('fa-pause-circle');
+    masterPlay.classList.replace('fa-play-circle', 'fa-pause-circle');
     gif.style.opacity = 1;
   } else {
     audioElement.pause();
-    masterPlay.classList.remove('fa-pause-circle');
-    masterPlay.classList.add('fa-play-circle');
+    masterPlay.classList.replace('fa-pause-circle', 'fa-play-circle');
     gif.style.opacity = 0;
   }
 });
 
-// Progress
-audioElement.addEventListener('timeupdate', () => {
-  if (audioElement.duration) {
-    const progress = parseInt((audioElement.currentTime / audioElement.duration) * 100);
-    myProgressBar.value = progress;
+// Volume
+volumeSlider.addEventListener('input', (e) => {
+  audioElement.volume = e.target.value / 100;
+  volumeIcon.className = audioElement.volume === 0 ? 'fas fa-volume-mute fa-2x' : 'fas fa-volume-up fa-2x';
+});
+volumeIcon.addEventListener('click', () => {
+  if (audioElement.volume > 0) {
+    volumeSlider.value = 0;
+    audioElement.volume = 0;
+    volumeIcon.className = 'fas fa-volume-mute fa-2x';
+  } else {
+    volumeSlider.value = 50;
+    audioElement.volume = 0.5;
+    volumeIcon.className = 'fas fa-volume-up fa-2x';
   }
 });
 
-myProgressBar.addEventListener('change', () => {
-  audioElement.currentTime = myProgressBar.value * audioElement.duration / 100;
+// Time update
+audioElement.addEventListener('loadedmetadata', () => {
+  totalTimeEl.textContent = formatTime(audioElement.duration);
+});
+audioElement.addEventListener('timeupdate', () => {
+  if (audioElement.duration) {
+    const progress = (audioElement.currentTime / audioElement.duration) * 100;
+    myProgressBar.value = progress;
+    currentTimeEl.textContent = formatTime(audioElement.currentTime);
+  }
 });
 
-const makeAllPlays = () => {
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+myProgressBar.addEventListener('input', (e) => {
+  audioElement.currentTime = (e.target.value / 100) * audioElement.duration;
+});
+
+function makeAllPlays() {
   document.querySelectorAll('.songItemPlay').forEach(el => {
     el.classList.remove('fa-pause-circle');
     el.classList.add('fa-play-circle');
   });
-};
+}
 
-document.querySelectorAll('.songItemPlay').forEach((el, i) => {
-  el.addEventListener('click', (e) => {
-    makeAllPlays();
-    const target = e.target;
-    target.classList.remove('fa-play-circle');
-    target.classList.add('fa-pause-circle');
-    songIndex = i;
-    audioElement.src = songs[i].filePath;
-    masterSongName.textContent = songs[i].songName;
-    audioElement.currentTime = 0;
-    audioElement.play();
-    gif.style.opacity = 1;
-    masterPlay.classList.remove('fa-play-circle');
-    masterPlay.classList.add('fa-pause-circle');
-    saveRecent(i);
+function attachSongListeners() {
+  document.querySelectorAll('.songItemPlay').forEach((el, i) => {
+    el.addEventListener('click', (e) => {
+      makeAllPlays();
+      e.target.classList.replace('fa-play-circle', 'fa-pause-circle');
+      songIndex = i;
+      saveRecent(i);
+      updateUI();
+      audioElement.currentTime = 0;
+      audioElement.play();
+      masterPlay.classList.replace('fa-play-circle', 'fa-pause-circle');
+      gif.style.opacity = 1;
+    });
   });
-});
+}
 
 document.getElementById('next').addEventListener('click', () => {
   songIndex = (songIndex + 1) % songs.length;
-  audioElement.src = songs[songIndex].filePath;
-  masterSongName.textContent = songs[songIndex].songName;
-  audioElement.currentTime = 0;
-  audioElement.play();
-  masterPlay.classList.remove('fa-play-circle');
-  masterPlay.classList.add('fa-pause-circle');
   makeAllPlays();
-  document.querySelector(`[id="${songIndex}"]`).classList.remove('fa-play-circle');
-  document.querySelector(`[id="${songIndex}"]`).classList.add('fa-pause-circle');
+  document.querySelector(`#songItemContainer [id="${songIndex}"]`)?.classList.replace('fa-play-circle', 'fa-pause-circle');
   saveRecent(songIndex);
+  updateUI();
+  audioElement.play();
+  masterPlay.classList.replace('fa-play-circle', 'fa-pause-circle');
+  gif.style.opacity = 1;
 });
 
 document.getElementById('previous').addEventListener('click', () => {
   songIndex = (songIndex - 1 + songs.length) % songs.length;
-  audioElement.src = songs[songIndex].filePath;
-  masterSongName.textContent = songs[songIndex].songName;
-  audioElement.currentTime = 0;
-  audioElement.play();
-  masterPlay.classList.remove('fa-play-circle');
-  masterPlay.classList.add('fa-pause-circle');
   makeAllPlays();
-  document.querySelector(`[id="${songIndex}"]`).classList.remove('fa-play-circle');
-  document.querySelector(`[id="${songIndex}"]`).classList.add('fa-pause-circle');
+  document.querySelector(`#songItemContainer [id="${songIndex}"]`)?.classList.replace('fa-play-circle', 'fa-pause-circle');
   saveRecent(songIndex);
+  updateUI();
+  audioElement.play();
+  masterPlay.classList.replace('fa-play-circle', 'fa-pause-circle');
+  gif.style.opacity = 1;
 });
+
+loadRecent();
 
